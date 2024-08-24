@@ -155,6 +155,12 @@ pub struct Response {
     pub flow: Option<String>,
 }
 
+impl Default for Response {
+    fn default() -> Self {
+        Self { flow: None }
+    }
+}
+
 impl Response {
     pub fn len(&self) -> usize {
         let mut resp_len: usize = 2; // version + addons_header

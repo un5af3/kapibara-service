@@ -86,8 +86,7 @@ where
             }
         };
 
-        let resp = Response { flow: None };
-        let _ = resp
+        let _ = Response::default()
             .write(&mut stream, None)
             .await
             .map_err(|e| InboundError::Handshake(e.into()))?;
