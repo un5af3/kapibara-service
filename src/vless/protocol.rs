@@ -187,6 +187,30 @@ impl Response {
         Ok(resp)
     }
 
+    pub fn read_buf(buf: &[u8]) -> Result<Response, VlessError> {
+        if buf.len() < 2 {
+            return Err(VlessError::UnknownVersion);
+        }
+
+        let version = buf[0];
+        if version != VERSION {
+            return Err(VlessError::InvalidVersion(version).into());
+        }
+
+        let mut resp = Response { flow: None };
+        let addons_len = buf[1];
+        if addons_len > 0 {
+            if buf.len() - 2 > addons_len as usize {
+                return Err(VlessError::InvalidHeader(addons_len));
+            }
+
+            let addons = Addons::parse(&buf[..addons_len as usize])?;
+            resp.flow = addons.flow;
+        }
+
+        Ok(resp)
+    }
+
     pub async fn write<W>(&self, writer: &mut W, payload: Option<&[u8]>) -> Result<(), VlessError>
     where
         W: AsyncWrite + Unpin,

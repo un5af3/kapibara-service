@@ -8,7 +8,7 @@ use crate::{
     option::OutboundServiceOption,
     socks::SocksOutbound,
     svc_stream_traits_enum,
-    vless::VlessOutbound,
+    vless::{outbound::VlessStream, VlessOutbound},
     OutboundResult, OutboundServiceTrait, ServiceAddress,
 };
 
@@ -88,6 +88,7 @@ svc_stream_traits_enum! {
         S: AsyncRead + AsyncWrite + Unpin + Send + Sync,
     {
         Raw(S),
+        Vless(VlessStream<S>),
         Direct(DirectStream),
     }
 }
