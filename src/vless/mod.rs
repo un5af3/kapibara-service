@@ -7,7 +7,7 @@ pub mod inbound;
 pub use inbound::VlessInbound;
 
 pub mod outbound;
-pub use outbound::VlessOutbound;
+pub use outbound::{VlessOutbound, VlessOutboundStream};
 
 pub mod protocol;
 pub use protocol::Request;

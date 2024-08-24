@@ -35,7 +35,7 @@ impl<S> OutboundServiceTrait<S> for VlessOutbound
 where
     S: AsyncRead + AsyncWrite + Unpin + Send + Sync,
 {
-    type Stream = VlessStream<S>;
+    type Stream = VlessOutboundStream<S>;
 
     async fn handshake(&self, stream: S, packet: OutboundPacket) -> OutboundResult<Self::Stream> {
         let command = match packet.typ {
@@ -58,12 +58,12 @@ where
 
         let stream = stream.into_inner();
 
-        Ok(VlessStream::new(stream))
+        Ok(VlessOutboundStream::new(stream))
     }
 }
 
 #[derive(Debug)]
-pub struct VlessStream<S>
+pub struct VlessOutboundStream<S>
 where
     S: AsyncRead + AsyncWrite + Unpin + Send + Sync,
 {
@@ -71,7 +71,7 @@ where
     check_resp: bool,
 }
 
-impl<S> VlessStream<S>
+impl<S> VlessOutboundStream<S>
 where
     S: AsyncRead + AsyncWrite + Unpin + Send + Sync,
 {
@@ -83,16 +83,16 @@ where
     }
 }
 
-impl<S> From<VlessStream<S>> for OutboundServiceStream<S>
+impl<S> From<VlessOutboundStream<S>> for OutboundServiceStream<S>
 where
     S: AsyncRead + AsyncWrite + Unpin + Send + Sync,
 {
-    fn from(value: VlessStream<S>) -> Self {
+    fn from(value: VlessOutboundStream<S>) -> Self {
         OutboundServiceStream::Vless(value)
     }
 }
 
-impl<S> AsyncRead for VlessStream<S>
+impl<S> AsyncRead for VlessOutboundStream<S>
 where
     S: AsyncRead + AsyncWrite + Unpin + Send + Sync,
 {
@@ -121,7 +121,7 @@ where
     }
 }
 
-impl<S> AsyncWrite for VlessStream<S>
+impl<S> AsyncWrite for VlessOutboundStream<S>
 where
     S: AsyncRead + AsyncWrite + Unpin + Send + Sync,
 {
