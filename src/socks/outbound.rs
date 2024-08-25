@@ -1,6 +1,6 @@
 //! Socks service for outbound
 
-use tokio::io::{AsyncRead, AsyncWrite, BufStream};
+use tokio::io::{AsyncRead, AsyncWrite};
 
 use crate::{
     address::NetworkType, Address, OutboundError, OutboundPacket, OutboundResult,
@@ -46,7 +46,11 @@ where
 {
     type Stream = S;
 
-    async fn handshake(&self, stream: S, packet: OutboundPacket) -> OutboundResult<Self::Stream> {
+    async fn handshake(
+        &self,
+        mut stream: S,
+        packet: OutboundPacket,
+    ) -> OutboundResult<Self::Stream> {
         let addr = match packet.dest.addr {
             Address::Domain(domain) => SocksAddr::Domain(domain),
             Address::Socket(ip) => SocksAddr::Socket(ip),
@@ -64,12 +68,10 @@ where
 
         let mut cli = SocksClientHandshake::new(req);
 
-        let mut buf_stream = BufStream::with_capacity(1024, 1024, stream);
         let reply = cli
-            .connect(&mut buf_stream)
+            .connect(&mut stream)
             .await
             .map_err(|e| OutboundError::Handshake(e.into()))?;
-        let stream = buf_stream.into_inner();
 
         if reply.status() != SocksStatus::SUCCEEDED {
             return Err(OutboundError::Handshake(

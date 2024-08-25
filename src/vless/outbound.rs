@@ -1,6 +1,6 @@
 use std::{pin::Pin, str::FromStr, task::Poll};
 
-use tokio::io::{AsyncRead, AsyncWrite, BufStream};
+use tokio::io::{AsyncRead, AsyncWrite};
 use uuid::Uuid;
 
 use crate::{
@@ -37,7 +37,11 @@ where
 {
     type Stream = VlessOutboundStream<S>;
 
-    async fn handshake(&self, stream: S, packet: OutboundPacket) -> OutboundResult<Self::Stream> {
+    async fn handshake(
+        &self,
+        mut stream: S,
+        packet: OutboundPacket,
+    ) -> OutboundResult<Self::Stream> {
         let command = match packet.typ {
             NetworkType::Tcp => COMMAND_TCP,
             NetworkType::Udp => COMMAND_UDP,
@@ -50,13 +54,10 @@ where
             destination: Some(packet.dest),
         };
 
-        let mut stream = BufStream::with_capacity(1024, 1024, stream);
         let _ = req
             .write(&mut stream, None)
             .await
             .map_err(|e| OutboundError::Handshake(e.into()))?;
-
-        let stream = stream.into_inner();
 
         Ok(VlessOutboundStream::new(stream))
     }

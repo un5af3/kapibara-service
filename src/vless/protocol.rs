@@ -107,7 +107,7 @@ impl Request {
         W: AsyncWrite + Unpin,
     {
         let _ = writer.write_all(&self.into_buf(payload)?).await?;
-        let _ = writer.flush().await?;
+        //let _ = writer.flush().await?;
 
         Ok(())
     }
@@ -222,7 +222,7 @@ impl Response {
         W: AsyncWrite + Unpin,
     {
         let _ = writer.write_all(&self.into_buf(payload)?).await?;
-        let _ = writer.flush().await?;
+        //let _ = writer.flush().await?;
 
         Ok(())
     }

@@ -3,7 +3,7 @@
 use std::net::{IpAddr, Ipv4Addr};
 
 use bytes::BufMut;
-use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt};
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
 use super::{
     SocksAddr, SocksAuth, SocksError, SocksReply, SocksRequest, SocksStatus, SocksVersion,
@@ -37,7 +37,7 @@ impl SocksClientHandshake {
 
     pub async fn connect<S>(&mut self, stream: &mut S) -> Result<SocksReply, SocksError>
     where
-        S: AsyncBufReadExt + AsyncReadExt + AsyncWriteExt + Unpin,
+        S: AsyncReadExt + AsyncWriteExt + Unpin,
     {
         loop {
             if let Some(reply) = self.handshake(stream).await? {
@@ -48,7 +48,7 @@ impl SocksClientHandshake {
 
     pub async fn handshake<S>(&mut self, stream: &mut S) -> Result<Option<SocksReply>, SocksError>
     where
-        S: AsyncBufReadExt + AsyncReadExt + AsyncWriteExt + Unpin,
+        S: AsyncReadExt + AsyncWriteExt + Unpin,
     {
         use State::*;
 
@@ -74,7 +74,7 @@ impl SocksClientHandshake {
 
     async fn send_v4<S>(&mut self, stream: &mut S) -> Result<Option<SocksReply>, SocksError>
     where
-        S: AsyncBufReadExt + AsyncReadExt + AsyncWriteExt + Unpin,
+        S: AsyncReadExt + AsyncWriteExt + Unpin,
     {
         let mut msg = vec![];
 
@@ -117,7 +117,7 @@ impl SocksClientHandshake {
 
     async fn handle_v4<S>(&mut self, stream: &mut S) -> Result<Option<SocksReply>, SocksError>
     where
-        S: AsyncBufReadExt + AsyncReadExt + AsyncWriteExt + Unpin,
+        S: AsyncReadExt + AsyncWriteExt + Unpin,
     {
         let ver = stream.read_u8().await?;
         if ver != 0 {
@@ -140,7 +140,7 @@ impl SocksClientHandshake {
 
     async fn send_v5_initial<S>(&mut self, stream: &mut S) -> Result<Option<SocksReply>, SocksError>
     where
-        S: AsyncBufReadExt + AsyncReadExt + AsyncWriteExt + Unpin,
+        S: AsyncReadExt + AsyncWriteExt + Unpin,
     {
         let mut msg = vec![];
 
@@ -169,7 +169,7 @@ impl SocksClientHandshake {
 
     async fn handle_v5_auth<S>(&mut self, stream: &mut S) -> Result<Option<SocksReply>, SocksError>
     where
-        S: AsyncBufReadExt + AsyncReadExt + AsyncWriteExt + Unpin,
+        S: AsyncReadExt + AsyncWriteExt + Unpin,
     {
         let ver = stream.read_u8().await?;
         if ver != 5 {
@@ -194,7 +194,7 @@ impl SocksClientHandshake {
         stream: &mut S,
     ) -> Result<Option<SocksReply>, SocksError>
     where
-        S: AsyncBufReadExt + AsyncReadExt + AsyncWriteExt + Unpin,
+        S: AsyncReadExt + AsyncWriteExt + Unpin,
     {
         let ver = stream.read_u8().await?;
         if ver != 1 {
@@ -247,7 +247,7 @@ impl SocksClientHandshake {
 
     async fn handle_v5_final<S>(&mut self, stream: &mut S) -> Result<Option<SocksReply>, SocksError>
     where
-        S: AsyncBufReadExt + AsyncReadExt + AsyncWriteExt + Unpin,
+        S: AsyncReadExt + AsyncWriteExt + Unpin,
     {
         let ver = stream.read_u8().await?;
         if ver != 5 {

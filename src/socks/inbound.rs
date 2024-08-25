@@ -2,7 +2,7 @@
 
 use std::borrow::Cow;
 
-use tokio::io::{AsyncRead, AsyncWrite, AsyncWriteExt, BufStream};
+use tokio::io::{AsyncRead, AsyncWrite, AsyncWriteExt};
 
 use crate::{
     address::NetworkType, Address, InboundError, InboundPacket, InboundResult, InboundServiceTrait,
@@ -49,15 +49,16 @@ where
 {
     type Stream = S;
 
-    async fn handshake(&self, stream: S) -> InboundResult<(Self::Stream, crate::InboundPacket)> {
+    async fn handshake(
+        &self,
+        mut stream: S,
+    ) -> InboundResult<(Self::Stream, crate::InboundPacket)> {
         let mut srv_hand = SocksServerHandshake::new();
 
-        let mut stream = BufStream::with_capacity(1024, 1024, stream);
         let request = srv_hand
             .accept(&mut stream)
             .await
             .map_err(|e| InboundError::Handshake(e.into()))?;
-        let mut stream = stream.into_inner();
 
         if !self.auth(request.auth()) {
             if let Ok(msg) = request.reply(SocksStatus::NOT_ALLOWED, None) {
