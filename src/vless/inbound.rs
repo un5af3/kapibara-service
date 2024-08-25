@@ -1,6 +1,6 @@
 use std::{borrow::Cow, collections::HashMap, str::FromStr};
 
-use tokio::io::{AsyncRead, AsyncWrite, BufStream};
+use tokio::io::{AsyncRead, AsyncWrite};
 use uuid::Uuid;
 
 use crate::{
@@ -42,8 +42,7 @@ where
 {
     type Stream = S;
 
-    async fn handshake(&self, stream: S) -> InboundResult<(Self::Stream, InboundPacket)> {
-        let mut stream = BufStream::with_capacity(1024, 1024, stream);
+    async fn handshake(&self, mut stream: S) -> InboundResult<(Self::Stream, InboundPacket)> {
         let request = Request::read(&mut stream)
             .await
             .map_err(|e| InboundError::Handshake(e.into()))?;
@@ -90,7 +89,6 @@ where
             .write(&mut stream, None)
             .await
             .map_err(|e| InboundError::Handshake(e.into()))?;
-        let stream = stream.into_inner();
 
         Ok((stream, pac))
     }
