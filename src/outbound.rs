@@ -1,13 +1,13 @@
 //! Outbound Service
 
-use tokio::io::{AsyncRead, AsyncWrite};
+use tokio::io::{AsyncRead, AsyncWrite, BufStream};
 
 use crate::{
     address::NetworkType,
     direct::{DirectOutbound, DirectStream},
+    http::HttpOutbound,
     option::OutboundServiceOption,
     socks::SocksOutbound,
-    svc_stream_traits_enum,
     vless::{VlessOutbound, VlessOutboundStream},
     OutboundResult, OutboundServiceTrait, ServiceAddress,
 };
@@ -72,22 +72,110 @@ macro_rules! outbound_service_enum {
     };
 }
 
+macro_rules! out_stream_traits_enum {
+    {
+        $(#[$meta:meta])*
+        $v:vis enum $name:ident<S>
+        where
+            S: AsyncRead + AsyncWrite + Unpin + Send + Sync,
+        {
+            $(
+                $(#[$item_meta:meta])*
+                $id:ident($id_ty:ty),
+            )+
+        }
+    } => {
+        $(#[$meta])*
+        $v enum $name<S>
+        where
+            S: tokio::io::AsyncRead + tokio::io::AsyncWrite + Unpin + Send + Sync,
+        {
+            $(
+                $(#[$item_meta])*
+                $id($id_ty),
+            )+
+        }
+
+        impl<S> tokio::io::AsyncRead for $name<S>
+        where
+            S: tokio::io::AsyncRead + tokio::io::AsyncWrite + Unpin + Send + Sync,
+        {
+            #[inline]
+            fn poll_read(
+                self: std::pin::Pin<&mut Self>,
+                cx: &mut std::task::Context<'_>,
+                buf: &mut tokio::io::ReadBuf<'_>,
+            ) -> std::task::Poll<std::io::Result<()>> {
+                match self.get_mut() {
+                    $(
+                        $name::$id(val) => std::pin::Pin::new(val).poll_read(cx, buf),
+                    )+
+                }
+            }
+        }
+
+        impl<S> tokio::io::AsyncWrite for $name<S>
+        where
+            S: tokio::io::AsyncRead + tokio::io::AsyncWrite + Unpin + Send + Sync,
+        {
+            #[inline]
+            fn poll_write(
+                self: std::pin::Pin<&mut Self>,
+                cx: &mut std::task::Context<'_>,
+                buf: &[u8],
+            ) -> std::task::Poll<std::io::Result<usize>> {
+                match self.get_mut() {
+                    $(
+                        $name::$id(val) => std::pin::Pin::new(val).poll_write(cx, buf),
+                    )+
+                }
+            }
+
+            #[inline]
+            fn poll_flush(
+                self: std::pin::Pin<&mut Self>,
+                cx: &mut std::task::Context<'_>,
+            ) -> std::task::Poll<std::io::Result<()>> {
+                match self.get_mut() {
+                    $(
+                        $name::$id(val) => std::pin::Pin::new(val).poll_flush(cx),
+                    )+
+                }
+            }
+
+            #[inline]
+            fn poll_shutdown(
+                self: std::pin::Pin<&mut Self>,
+                cx: &mut std::task::Context<'_>,
+            ) -> std::task::Poll<std::io::Result<()>> {
+                match self.get_mut() {
+                    $(
+                        $name::$id(val) => std::pin::Pin::new(val).poll_shutdown(cx),
+                    )+
+                }
+            }
+        }
+    };
+}
+
 outbound_service_enum! {
     #[derive(Debug)]
     pub enum OutboundService {
         Direct(DirectOutbound),
         Vless(VlessOutbound),
         Socks(SocksOutbound),
+        Http(HttpOutbound),
     }
 }
 
-svc_stream_traits_enum! {
+out_stream_traits_enum! {
     #[derive(Debug)]
     pub enum OutboundServiceStream<S>
     where
         S: AsyncRead + AsyncWrite + Unpin + Send + Sync,
     {
         Raw(S),
+        Buf(BufStream<S>),
         Direct(DirectStream),
         Vless(VlessOutboundStream<S>),
     }
@@ -102,12 +190,22 @@ where
     }
 }
 
+impl<S> From<BufStream<S>> for OutboundServiceStream<S>
+where
+    S: AsyncRead + AsyncWrite + Unpin + Send + Sync,
+{
+    fn from(value: BufStream<S>) -> Self {
+        Self::Buf(value)
+    }
+}
+
 impl OutboundService {
     pub fn init(opt: OutboundServiceOption) -> OutboundResult<OutboundService> {
         match opt {
             OutboundServiceOption::Direct => Ok(DirectOutbound.into()),
             OutboundServiceOption::Vless(o) => Ok(VlessOutbound::init(o)?.into()),
             OutboundServiceOption::Socks(o) => Ok(SocksOutbound::init(o)?.into()),
+            OutboundServiceOption::Http(o) => Ok(HttpOutbound::init(o)?.into()),
         }
     }
 }

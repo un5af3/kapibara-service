@@ -2,12 +2,16 @@
 
 use std::borrow::Cow;
 
-use tokio::io::{AsyncRead, AsyncWrite};
+use tokio::io::{AsyncRead, AsyncWrite, BufStream};
 
 use crate::{
-    address::NetworkType, option::InboundServiceOption, socks::SocksInbound,
-    svc_stream_traits_enum, vless::VlessInbound, InboundResult, InboundServiceTrait,
-    ServiceAddress,
+    address::NetworkType,
+    http::{HttpInbound, HttpInboundStream},
+    mixed::{MixedInbound, MixedInboundStream},
+    option::InboundServiceOption,
+    socks::SocksInbound,
+    vless::VlessInbound,
+    CachedStream, InboundResult, InboundServiceTrait, ServiceAddress,
 };
 
 #[derive(Debug, Clone)]
@@ -74,21 +78,113 @@ macro_rules! inbound_service_enum {
     };
 }
 
+macro_rules! in_stream_traits_enum {
+    {
+        $(#[$meta:meta])*
+        $v:vis enum $name:ident<S>
+        where
+            S: AsyncRead + AsyncWrite + Unpin + Send + Sync,
+        {
+            $(
+                $(#[$item_meta:meta])*
+                $id:ident($id_ty:ty),
+            )+
+        }
+    } => {
+        $(#[$meta])*
+        $v enum $name<S>
+        where
+            S: tokio::io::AsyncRead + tokio::io::AsyncWrite + Unpin + Send + Sync,
+        {
+            $(
+                $(#[$item_meta])*
+                $id($id_ty),
+            )+
+        }
+
+        impl<S> tokio::io::AsyncRead for $name<S>
+        where
+            S: tokio::io::AsyncRead + tokio::io::AsyncWrite + Unpin + Send + Sync,
+        {
+            #[inline]
+            fn poll_read(
+                self: std::pin::Pin<&mut Self>,
+                cx: &mut std::task::Context<'_>,
+                buf: &mut tokio::io::ReadBuf<'_>,
+            ) -> std::task::Poll<std::io::Result<()>> {
+                match self.get_mut() {
+                    $(
+                        $name::$id(val) => std::pin::Pin::new(val).poll_read(cx, buf),
+                    )+
+                }
+            }
+        }
+
+        impl<S> tokio::io::AsyncWrite for $name<S>
+        where
+            S: tokio::io::AsyncRead + tokio::io::AsyncWrite + Unpin + Send + Sync,
+        {
+            #[inline]
+            fn poll_write(
+                self: std::pin::Pin<&mut Self>,
+                cx: &mut std::task::Context<'_>,
+                buf: &[u8],
+            ) -> std::task::Poll<std::io::Result<usize>> {
+                match self.get_mut() {
+                    $(
+                        $name::$id(val) => std::pin::Pin::new(val).poll_write(cx, buf),
+                    )+
+                }
+            }
+
+            #[inline]
+            fn poll_flush(
+                self: std::pin::Pin<&mut Self>,
+                cx: &mut std::task::Context<'_>,
+            ) -> std::task::Poll<std::io::Result<()>> {
+                match self.get_mut() {
+                    $(
+                        $name::$id(val) => std::pin::Pin::new(val).poll_flush(cx),
+                    )+
+                }
+            }
+
+            #[inline]
+            fn poll_shutdown(
+                self: std::pin::Pin<&mut Self>,
+                cx: &mut std::task::Context<'_>,
+            ) -> std::task::Poll<std::io::Result<()>> {
+                match self.get_mut() {
+                    $(
+                        $name::$id(val) => std::pin::Pin::new(val).poll_shutdown(cx),
+                    )+
+                }
+            }
+        }
+    };
+}
+
 inbound_service_enum! {
     #[derive(Debug)]
     pub enum InboundService {
-        Vless(VlessInbound),
+        Http(HttpInbound),
         Socks(SocksInbound),
+        Miexd(MixedInbound),
+        Vless(VlessInbound),
     }
 }
 
-svc_stream_traits_enum! {
+in_stream_traits_enum! {
     #[derive(Debug)]
     pub enum InboundServiceStream<S>
     where
      S: AsyncRead + AsyncWrite + Unpin + Send + Sync,
     {
         Raw(S),
+        Buf(BufStream<S>),
+        Cached(CachedStream<S>),
+        Http(HttpInboundStream<S>),
+        Mixed(MixedInboundStream<S>),
     }
 }
 
@@ -101,11 +197,31 @@ where
     }
 }
 
+impl<S> From<BufStream<S>> for InboundServiceStream<S>
+where
+    S: AsyncRead + AsyncWrite + Unpin + Send + Sync,
+{
+    fn from(value: BufStream<S>) -> Self {
+        Self::Buf(value)
+    }
+}
+
+impl<S> From<CachedStream<S>> for InboundServiceStream<S>
+where
+    S: AsyncRead + AsyncWrite + Unpin + Send + Sync,
+{
+    fn from(value: CachedStream<S>) -> Self {
+        Self::Cached(value)
+    }
+}
+
 impl InboundService {
     pub fn init(opt: InboundServiceOption) -> InboundResult<InboundService> {
         match opt {
-            InboundServiceOption::Vless(o) => Ok(VlessInbound::init(o)?.into()),
+            InboundServiceOption::Http(o) => Ok(HttpInbound::init(o)?.into()),
             InboundServiceOption::Socks(o) => Ok(SocksInbound::init(o)?.into()),
+            InboundServiceOption::Mixed(o) => Ok(MixedInbound::init(o)?.into()),
+            InboundServiceOption::Vless(o) => Ok(VlessInbound::init(o)?.into()),
         }
     }
 }

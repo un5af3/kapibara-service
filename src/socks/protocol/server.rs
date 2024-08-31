@@ -4,7 +4,7 @@ use core::str;
 use std::net::{IpAddr, Ipv4Addr};
 
 use bytes::BufMut;
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt};
 
 use super::{
     SocksAddr, SocksAuth, SocksCommand, SocksError, SocksRequest, SocksStatus, SocksVersion,
@@ -47,7 +47,7 @@ impl SocksServerHandshake {
 
     pub async fn accept<S>(&mut self, stream: &mut S) -> Result<SocksRequest, SocksError>
     where
-        S: AsyncReadExt + AsyncWriteExt + Unpin,
+        S: AsyncReadExt + AsyncBufReadExt + AsyncWriteExt + Unpin,
     {
         loop {
             if let Some(request) = self.handshake(stream).await? {
@@ -58,7 +58,7 @@ impl SocksServerHandshake {
 
     pub async fn handshake<S>(&mut self, stream: &mut S) -> Result<Option<SocksRequest>, SocksError>
     where
-        S: AsyncReadExt + AsyncWriteExt + Unpin,
+        S: AsyncReadExt + AsyncBufReadExt + AsyncWriteExt + Unpin,
     {
         let ver = stream.read_u8().await?;
 
@@ -82,7 +82,7 @@ impl SocksServerHandshake {
 
     pub async fn s4<S>(&mut self, stream: &mut S) -> Result<Option<SocksRequest>, SocksError>
     where
-        S: AsyncReadExt + AsyncWriteExt + Unpin,
+        S: AsyncReadExt + AsyncBufReadExt + AsyncWriteExt + Unpin,
     {
         let command: SocksCommand = stream
             .read_u8()
@@ -94,22 +94,22 @@ impl SocksServerHandshake {
 
         let mut buf = Vec::with_capacity(255);
         buf.clear();
-        let n = read_until(stream, 0, &mut buf, 255).await?;
+        let n = stream.read_until(0, &mut buf).await?;
         let auth = if n == 0 {
             SocksAuth::NoAuth
         } else {
-            SocksAuth::Socks4(buf[..n].to_vec())
+            SocksAuth::Socks4(buf[..n - 1].to_vec())
         };
 
         let addr = if ip != 0 && (ip >> 8) == 0 {
             // Socks4a; a hostname is given.
             buf.clear();
-            let n = read_until(stream, 0, &mut buf, 255).await?;
+            let n = stream.read_until(0, &mut buf).await?;
             if n == 0 {
                 return Err(SocksError::InvalidAddress);
             }
 
-            let hostname = str::from_utf8(&buf[..n])?;
+            let hostname = str::from_utf8(&buf[..n - 1])?;
 
             SocksAddr::Domain(hostname.to_owned())
         } else {
@@ -129,7 +129,7 @@ impl SocksServerHandshake {
         stream: &mut S,
     ) -> Result<Option<SocksRequest>, SocksError>
     where
-        S: AsyncReadExt + AsyncWriteExt + Unpin,
+        S: AsyncReadExt + AsyncBufReadExt + AsyncWriteExt + Unpin,
     {
         let nmethods = stream.read_u8().await?;
         let mut methods = vec![0u8; nmethods as usize];
@@ -153,7 +153,7 @@ impl SocksServerHandshake {
 
     pub async fn s5_uname<S>(&mut self, stream: &mut S) -> Result<Option<SocksRequest>, SocksError>
     where
-        S: AsyncReadExt + AsyncWriteExt + Unpin,
+        S: AsyncReadExt + AsyncBufReadExt + AsyncWriteExt + Unpin,
     {
         let ulen = stream.read_u8().await?;
         let mut username = vec![0u8; ulen as usize];
@@ -174,7 +174,7 @@ impl SocksServerHandshake {
 
     pub async fn s5<S>(&mut self, stream: &mut S) -> Result<Option<SocksRequest>, SocksError>
     where
-        S: AsyncReadExt + AsyncWriteExt + Unpin,
+        S: AsyncReadExt + AsyncBufReadExt + AsyncWriteExt + Unpin,
     {
         let command = stream
             .read_u8()
@@ -242,38 +242,4 @@ impl SocksRequest {
         }
         Ok(w)
     }
-}
-
-async fn read_until<S>(
-    stream: &mut S,
-    byte: u8,
-    buf: &mut Vec<u8>,
-    max_size: usize,
-) -> std::io::Result<usize>
-where
-    S: AsyncReadExt + AsyncWriteExt + Unpin,
-{
-    let mut amt: usize = 0;
-
-    while buf.len() < max_size {
-        match stream.read_u8().await {
-            Ok(b) => {
-                if b == byte {
-                    return Ok(amt);
-                }
-
-                buf.push(b);
-                amt += 1;
-            }
-            Err(e) => {
-                if e.kind() == std::io::ErrorKind::UnexpectedEof {
-                    return Ok(amt);
-                }
-
-                return Err(e);
-            }
-        }
-    }
-
-    Err(std::io::Error::other("exceed the buf capacity"))
 }

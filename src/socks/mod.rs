@@ -43,7 +43,7 @@ mod tests {
             let socks_in = SocksInbound::init(svc_opt).unwrap();
 
             loop {
-                let (s, p) = socks_in.handshake(&mut s2).await.unwrap();
+                let (mut s, p) = socks_in.handshake(&mut s2).await.unwrap();
                 println!("{:?}", p);
                 let mut buf = [0u8; 5];
                 let n = s.read(&mut buf).await.unwrap();

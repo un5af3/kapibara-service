@@ -1,6 +1,6 @@
 use std::{borrow::Cow, collections::HashMap, str::FromStr};
 
-use tokio::io::{AsyncRead, AsyncWrite};
+use tokio::io::{AsyncRead, AsyncWrite, BufStream};
 use uuid::Uuid;
 
 use crate::{
@@ -40,9 +40,10 @@ impl<S> InboundServiceTrait<S> for VlessInbound
 where
     S: AsyncRead + AsyncWrite + Unpin + Send + Sync,
 {
-    type Stream = S;
+    type Stream = BufStream<S>;
 
-    async fn handshake(&self, mut stream: S) -> InboundResult<(Self::Stream, InboundPacket)> {
+    async fn handshake(&self, stream: S) -> InboundResult<(Self::Stream, InboundPacket)> {
+        let mut stream = BufStream::new(stream);
         let request = Request::read(&mut stream)
             .await
             .map_err(|e| InboundError::Handshake(e.into()))?;

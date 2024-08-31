@@ -2,7 +2,7 @@
 
 use thiserror::Error;
 
-use crate::{socks::SocksError, vless::VlessError};
+use crate::{address::NetworkType, http::HttpError, socks::SocksError, vless::VlessError};
 
 #[derive(Debug, Error)]
 pub enum InboundError {
@@ -10,6 +10,8 @@ pub enum InboundError {
     Io(#[from] std::io::Error),
     #[error("option error ({0})")]
     Option(String),
+    #[error("address error ({0})")]
+    Address(#[from] AddressError),
     #[error("handshake error ({0})")]
     Handshake(#[from] ProtocolError),
 }
@@ -24,6 +26,8 @@ pub enum OutboundError {
     Handshake(#[from] ProtocolError),
     #[error("unresolved address")]
     Unresolved,
+    #[error("invalid type {0}")]
+    InvalidType(NetworkType),
 }
 
 #[derive(Debug, Error)]
@@ -44,4 +48,6 @@ pub enum ProtocolError {
     Vless(#[from] VlessError),
     #[error("[socks] {0}")]
     Socks(#[from] SocksError),
+    #[error("[http] {0}")]
+    Http(#[from] HttpError),
 }

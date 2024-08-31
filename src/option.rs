@@ -3,6 +3,8 @@
 use serde::{Deserialize, Serialize};
 
 use crate::{
+    http::{HttpInboundOption, HttpOutboundOption},
+    mixed::MixedInboundOption,
     socks::{SocksInboundOption, SocksOutboundOption},
     vless::{VlessInboundOption, VlessOutboundOption},
 };
@@ -10,14 +12,17 @@ use crate::{
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum InboundServiceOption {
-    Vless(VlessInboundOption),
+    Http(HttpInboundOption),
     Socks(SocksInboundOption),
+    Mixed(MixedInboundOption),
+    Vless(VlessInboundOption),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum OutboundServiceOption {
     Direct,
-    Vless(VlessOutboundOption),
+    Http(HttpOutboundOption),
     Socks(SocksOutboundOption),
+    Vless(VlessOutboundOption),
 }

@@ -2,7 +2,7 @@
 
 use std::borrow::Cow;
 
-use tokio::io::{AsyncRead, AsyncWrite, AsyncWriteExt};
+use tokio::io::{AsyncRead, AsyncWrite, AsyncWriteExt, BufStream};
 
 use crate::{
     address::NetworkType, Address, InboundError, InboundPacket, InboundResult, InboundServiceTrait,
@@ -47,12 +47,11 @@ impl<S> InboundServiceTrait<S> for SocksInbound
 where
     S: AsyncRead + AsyncWrite + Send + Sync + Unpin,
 {
-    type Stream = S;
+    type Stream = BufStream<S>;
 
-    async fn handshake(
-        &self,
-        mut stream: S,
-    ) -> InboundResult<(Self::Stream, crate::InboundPacket)> {
+    async fn handshake(&self, stream: S) -> InboundResult<(Self::Stream, crate::InboundPacket)> {
+        let mut stream = BufStream::new(stream);
+
         let mut srv_hand = SocksServerHandshake::new();
 
         let request = srv_hand
